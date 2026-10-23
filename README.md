@@ -5,7 +5,7 @@ It measures how greenness (NDVI), leaf water content (NDMI) and canopy height (L
 elevation inside two forested mountain watersheds in the Oregon Cascades, USA, and ends in a
 scroll-through web report.
 
-**[Read the interactive report](https://100FOUNTS.github.io/andrews-watershed/)**
+**[Read the interactive report](https://100founts.github.io/open-geospatial-pipeline/)**
 
 ![NDVI, NDMI and canopy height over hillshade, with the two watersheds outlined](figures/overview.png)
 
