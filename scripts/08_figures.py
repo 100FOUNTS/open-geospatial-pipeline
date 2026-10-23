@@ -43,8 +43,10 @@ def overview():
     panels = [("Summer NDVI", "ndvi_summer.tif", "RdYlGn", 0.2, 0.95, "NDVI"),
               ("Summer NDMI", "ndmi_summer.tif", "BrBG", -0.1, 0.6, "NDMI"),
               ("Canopy height (LiDAR 2021)", "chm.tif", "YlGn", 0, 60, "metres")]
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5.2), constrained_layout=True)
-    for ax, (title, file, ramp, vmin, vmax, label) in zip(axes, panels):
+    # Skip panels whose raster does not exist (for example, no LiDAR for the area).
+    panels = [p for p in panels if common.project_path("data", "processed", p[1]).exists()]
+    fig, axes = plt.subplots(1, len(panels), figsize=(5 * len(panels), 5.2), constrained_layout=True, squeeze=False)
+    for ax, (title, file, ramp, vmin, vmax, label) in zip(axes[0], panels):
         a, ext = _read(file)
         ax.imshow(shade, extent=shade_ext, cmap="gray", vmin=0, vmax=255)
         im = ax.imshow(a, extent=ext, cmap=ramp, vmin=vmin, vmax=vmax, alpha=0.85, interpolation="nearest")

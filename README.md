@@ -135,8 +135,7 @@ python -m http.server 8000 --directory docs    # then open http://localhost:8000
 Nothing needs an account or key. To try steps 4 to 7 without downloading anything, run
 `python tests/demo_data.py` (synthetic data; delete `data/processed/` before using real data).
 
-The study area is defined by `bbox` in `config.yml`. Sentinel-2 and the DEM work anywhere in the world; the
-LiDAR step needs public coverage there and a different `ept` URL.
+Sentinel-2 and the DEM work anywhere in the world; see "Use it on your own area" below to move the analysis.
 
 ### Manual review in QGIS (optional)
 
@@ -145,6 +144,70 @@ RdYlGn ramp from 0.2 to 0.95. Run *Hillshade* on `dtm.tif` and place it undernea
 *Voronoi polygons* on `training_points.gpkg` to see the Thiessen map; and use the raster calculator
 (`ndmi_kriging@1 - ndmi_summer@1`) to map where the interpolation error is high, which is where more
 sampling points are needed.
+
+## What each step costs
+
+| Step | Downloads | Disk | Notes |
+|---|---|---|---|
+| 1 `01_sentinel2.py` | 200–500 MB read | ~5 MB saved | Slow: depends on your connection |
+| 2 `02_dem.py` | under 1 MB | under 1 MB | Seconds |
+| 3 `03_lidar.py` | ~270 MB | ~0.8 GB with intermediates | The slowest; each stage is skipped if its file exists |
+| 4–8 | none | tens of MB | Run offline from the files above |
+
+If a script fails, read the last lines of the error first. The usual causes are no internet during steps 1–3, a missing
+`pdal` (activate the `andrews` environment) and a missing `data/processed/` file from an earlier step. Tested on macOS;
+Windows and Linux were not tried.
+
+## Use it on your own area
+
+Everything is driven by `config.yml`. To move the analysis somewhere else:
+
+1. **`area.bbox`**: `[lon_min, lat_min, lon_max, lat_max]` in degrees. Keep it to a few km on a side to start.
+2. **`area.epsg_utm`**: the UTM zone of your area, as a metric CRS (`326xx` in the northern hemisphere, `327xx` in the
+   southern one, with `xx` the zone number). Kriging, areas and distances need metres, so this is not optional.
+3. **`area.bbox_lidar`**: the part of the bbox you want LiDAR for. LiDAR is the heaviest download; a sub-area is a
+   good way to test.
+4. **`lidar.ept`**: the EPT address of a public point cloud that covers your area. The USGS 3DEP collections are listed in
+   the AWS Open Data registry (search "USGS 3DEP LiDAR Point Cloud"); outside the US you need to find a national or
+   regional open dataset. Without LiDAR, steps 1, 2, 4, 5 and 6 still run; skip step 3 and the canopy columns stay empty.
+5. **`dates` and `sentinel2.summer_months`**: pick the growing season of your hemisphere (for example
+   `[12, 1, 2]` in the south, with dates that cover those months).
+6. **Tune with your terrain in mind**: `lidar.smrf_slope` (raise it on steeper ground), `lidar.max_canopy_height`
+   (the tallest plausible tree), `hydrology.accumulation_threshold` (cells of 30 m that define a stream),
+   `hydrology.band_step_m` (width of each analysis band) and `hydrology.n_basins`.
+
+After step 1, read the control pixel the script prints: if the NDVI you get for dense vegetation is not roughly
+between 0.75 and 0.90, check the reflectance scale (`OFFSET_DN` in `scripts/common.py`) before trusting anything else.
+
+**About the report in `docs/`:** the numbers in it are filled from `docs/data/` and refresh when you re-run steps 6
+and 7, but the interpretation (the story about the 900–1,050 m band, the logbook, the limits) was written by hand for
+this study area. On a new area, edit `docs/index.html` or treat it as a template; do not publish it unchanged.
+
+## Exercises
+
+Each one is small and has a way to check it. Run `python -m pytest tests -q` after any change to `scripts/common.py`.
+
+1. **Add an index.** Add the NBR (`(NIR − SWIR2) / (NIR + SWIR2)`): request the `swir22` band in step 1, compute it in
+   `spectral_indices` and add a test with known reflectances, like the existing ones.
+2. **Test the clear-cut hypothesis.** Set `dates` to a summer from before 2021 (Sentinel-2 L2A exists from 2017) and re-run steps 1, 5, 6 and 7. If the
+   900–1,050 m band was still green then, the loss happened later. This is the question the report leaves open.
+3. **Does the dip depend on the band width?** Change `hydrology.band_step_m` to 100 and 200 and see whether the
+   low-NDVI band stays in the same place.
+4. **Cell size and canopy height.** Re-run step 3 (delete `data/raw/lidar/` first) with `lidar.raster_resolution` of 1.5, 3 and 6; for the finer cells also lower `lidar.ept_resolution`, which downloads many more points. Compare the mean
+   canopy height per band and explain why they differ (see the logbook).
+5. **Is kriging really better?** Change `kriging.seed` and `kriging.n_points` several times and count how often
+   kriging beats IDW. With 60 test points the 2 % gap in this report may be luck.
+6. **Another place.** Follow "Use it on your own area" for a forest with public LiDAR and write down what you had to
+   change that is not listed above.
+7. **Go further.** Sentinel-1 radar as a cloud-free moisture indicator; real soil-moisture sensors in place of the
+   synthetic NDMI sample; land-cover classification with very few field points.
+
+### Working with a coding agent
+
+An agent (Claude Code, Codex or similar) is useful for changing the area or adding indices. Give it a bounded task
+and a check, for example: "Add the NBR index to `spectral_indices` and a test with known values", or "Change the area
+to *X* and tell me which public LiDAR collections exist there before touching the code". Afterwards run
+`python -m pytest tests -q` and read the control pixel again: CRS and scale mistakes do not crash the program.
 
 ## Things that went wrong
 
