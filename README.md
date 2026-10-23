@@ -248,14 +248,15 @@ it cannot be installed.
 ## Repository layout
 
 ```
-config.yml          area, dates and parameters; every script reads it
-environment.yml     conda environment (Python, PDAL, R, QGIS not included)
-scripts/            01-08 numbered pipeline steps + common.py
-tests/              offline tests and a synthetic demo-data generator
-docs/               the web report (index.html, data/, img/) served by GitHub Pages
-figures/            static figures used in this README
-outputs/            small result tables (band summary, interpolation metrics)
-data/               created by the scripts; not versioned
+config.yml            area, dates and parameters; every script reads it
+environment.yml       conda environment (Python, PDAL, R, QGIS not included)
+environment.lock.yml  the exact versions this was run with (macOS, Apple silicon)
+scripts/              01-08 numbered pipeline steps + common.py
+tests/                offline tests and a synthetic demo-data generator
+docs/                 the web report (index.html, data/, img/) served by GitHub Pages
+figures/              static figures used in this README
+outputs/              small result tables (band summary, interpolation metrics)
+data/                 created by the scripts; not versioned
 ```
 
 ## Data and attribution
@@ -268,3 +269,5 @@ data/               created by the scripts; not versioned
 ## License
 
 The code is released under the [MIT License](LICENSE). The data keep the licences listed above.
+
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). To cite this work, use the "Cite this repository" button on GitHub ([CITATION.cff](CITATION.cff)).

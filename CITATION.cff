@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this pipeline, please cite it as below."
+title: "Open Geospatial Pipeline: vegetation, moisture and canopy height with open tools"
+type: software
+authors:
+  - name: "100FOUNTS"
+repository-code: "https://github.com/100FOUNTS/open-geospatial-pipeline"
+url: "https://100founts.github.io/open-geospatial-pipeline/"
+license: MIT
+keywords:
+  - remote sensing
+  - Sentinel-2
+  - LiDAR
+  - kriging
+  - hydrology
+  - GeoParquet
