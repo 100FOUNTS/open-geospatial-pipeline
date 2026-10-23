@@ -1,0 +1,33 @@
+name: andrews
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy
+  - scipy
+  - xarray
+  - rioxarray
+  - rasterio
+  - gdal
+  - geopandas
+  - pyproj
+  - shapely
+  - pyarrow
+  - python-duckdb
+  - dask
+  - zarr
+  - pyyaml
+  - matplotlib
+  - pytest
+  - pdal
+  - r-base
+  - r-terra
+  - r-sf
+  - r-gstat
+  - r-spdep
+  - r-yaml
+  - pip
+  - pip:
+      - pysheds
+      - odc-stac
+      - pystac-client

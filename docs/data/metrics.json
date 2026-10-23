@@ -1,0 +1,20 @@
+[
+  {
+    "method":"Kriging",
+    "RMSE":0.1418,
+    "MAE":0.0967,
+    "Bias":0.0363
+  },
+  {
+    "method":"IDW",
+    "RMSE":0.1445,
+    "MAE":0.1002,
+    "Bias":0.0346
+  },
+  {
+    "method":"Thiessen",
+    "RMSE":0.1874,
+    "MAE":0.1227,
+    "Bias":0.0398
+  }
+]

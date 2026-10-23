@@ -1,0 +1,12 @@
+# Downloaded and generated data (rebuild it with the scripts)
+/data/
+outputs/*
+!outputs/*.csv
+
+# Python / R / OS / editors
+__pycache__/
+.pytest_cache/
+*.zarr/
+.Rhistory
+.Rproj.user/
+.DS_Store

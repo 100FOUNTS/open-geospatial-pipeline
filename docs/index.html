@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Andrews Watershed: vegetation, moisture and forest height</title>
+<meta name="description" content="Report on an end-to-end geospatial analysis with open data: Sentinel-2, LiDAR and Copernicus DEM over a forested watershed in the Oregon Cascades.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --paper: #EDF1EC;      /* grey-green paper */
+    --card: #F8FAF7;
+    --ink: #14231D;        /* spruce ink */
+    --ink-2: #44564D;
+    --ink-3: #55675E;
+    --line: #CCD6CE;
+    --contour: #7F9A8B;
+    --moss: #2A8A47;       /* vegetation (NDVI) */
+    --water: #1C74B8;      /* leaf moisture (NDMI) and drainage */
+    --flag: #C2410C;       /* anomaly */
+    --f-display: "Bricolage Grotesque", system-ui, sans-serif;
+    --f-body: "Source Serif 4", Georgia, serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    --mapbg: #dfe6e1; --code-bg: #14231D; --code-fg: #DDE7E0; --errbg: #fff3ee; --contour-op: 0.55;
+    --measure: 62ch;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: 16px; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 18px/1.62 var(--f-body); }
+  a { color: inherit; text-underline-offset: 3px; }
+  :focus-visible { outline: 3px solid var(--water); outline-offset: 2px; border-radius: 2px; }
+  .container { max-width: 1180px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+  h1, h2, h3 { font-family: var(--f-display); font-weight: 700; line-height: 1.08; letter-spacing: -0.01em; margin: 0; }
+  h2 { font-size: clamp(1.7rem, 3.4vw, 2.4rem); }
+  h3 { font-size: 1.35rem; }
+  p { margin: 0 0 1em; max-width: var(--measure); }
+  .mono { font-family: var(--f-mono); font-size: 0.86em; }
+  .eyebrow { font: 500 12px/1.2 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 14px; }
+  .skip-link { position: absolute; left: 8px; top: -60px; background: var(--ink); color: var(--paper); padding: 8px 12px; z-index: 100; }
+  .skip-link:focus { top: 8px; }
+
+  /* ---------- Header ---------- */
+  .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+  .hero-contours { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: var(--contour-op);
+    -webkit-mask-image: linear-gradient(to bottom, #000 35%, transparent 100%); mask-image: linear-gradient(to bottom, #000 35%, transparent 100%); }
+  .hero-in { position: relative; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 48px; padding-block: 72px 64px; align-items: end; }
+  .hero h1 { font-size: clamp(2.3rem, 5.6vw, 4.2rem); max-width: 14ch; }
+  .lede { font-size: 1.22rem; color: var(--ink-2); margin-top: 22px; }
+  .factsheet { background: color-mix(in srgb, var(--card) 88%, transparent); border: 1px solid var(--ink); padding: 0; margin: 0; }
+  .factsheet-title { font: 500 11px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 9px 14px; background: var(--ink); color: var(--paper); }
+  .factsheet dl { margin: 0; }
+  .factsheet div { display: grid; grid-template-columns: 7.2rem 1fr; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--line); font-size: 0.95rem; line-height: 1.4; }
+  .factsheet div:first-child { border-top: 0; }
+  .factsheet dt { font: 500 11px/1.5 var(--f-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
+  .factsheet dd { margin: 0; }
+
+  /* ---------- Sections ---------- */
+  section.block { padding: 72px 0; border-bottom: 1px solid var(--line); }
+  .block > .container > h2 { margin-bottom: 8px; }
+  .intro { color: var(--ink-2); font-size: 1.08rem; margin-bottom: 36px; }
+  .finding { border-left: 4px solid var(--flag); background: var(--card); padding: 20px 24px; max-width: 760px; margin-top: 28px; }
+  .finding p { margin: 0; font-size: 1.12rem; }
+  .finding .num { font-family: var(--f-mono); font-size: 0.9em; font-weight: 500; color: var(--flag); white-space: nowrap; }
+
+  /* ---------- Scrolling map ---------- */
+  .scrolly { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; }
+  .map-col { order: 2; }
+  .chapters { order: 1; }
+  .map-box { position: sticky; top: 12px; height: calc(100vh - 24px); max-height: 780px; display: flex; flex-direction: column; gap: 8px; }
+  .map-bar { display: flex; flex-wrap: wrap; gap: 6px; }
+  .map-bar button { font: 500 12px/1 var(--f-mono); letter-spacing: 0.03em; padding: 9px 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+  .map-bar button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  #leaflet-map { flex: 1; min-height: 300px; border: 1px solid var(--ink); background: var(--mapbg); }
+  .leaflet-tile-pane { filter: grayscale(0.7) contrast(0.92) brightness(1.04); }
+  .legend { min-height: 44px; font: 12px/1.35 var(--f-mono); color: var(--ink-2); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .legend .bar { width: 190px; height: 10px; border: 1px solid var(--ink); }
+  .legend .range { display: flex; justify-content: space-between; width: 190px; }
+  .legend .sw { display: inline-block; width: 22px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; }
+  .legend .sw.rel { height: 12px; border: 2px solid var(--flag); background: color-mix(in srgb, var(--flag) 25%, transparent); width: 18px; }
+  .opacity-ctl { font: 12px var(--f-mono); color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+  .opacity-ctl input { width: 120px; }
+  .chapter { min-height: 78vh; padding: 9vh 0; opacity: 0.38; transition: opacity 0.3s; }
+  .chapter.active { opacity: 1; }
+  .chapter h3 { margin-bottom: 12px; }
+  .chapter .tool { font: 12px/1.5 var(--f-mono); color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 10px; margin-top: 18px; max-width: var(--measure); }
+  .chapter .reading { border-left: 3px solid var(--moss); padding-left: 14px; font-style: italic; }
+
+  /* ---------- Method ---------- */
+  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; position: relative; }
+  .steps::before { content: ""; position: absolute; left: 17px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+  .steps li { position: relative; padding: 0 0 26px 58px; counter-increment: step; }
+  .steps li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); font: 500 14px/32px var(--f-mono); text-align: center; }
+  .steps h3 { font-size: 1.15rem; margin-bottom: 4px; }
+  .steps p { margin: 0; color: var(--ink-2); font-size: 1rem; }
+  .steps .io { font: 12px/1.6 var(--f-mono); color: var(--ink-3); margin-top: 6px; }
+
+  /* ---------- Charts ---------- */
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .panel { background: var(--card); border: 1px solid var(--line); padding: 18px 20px 14px; position: relative; }
+  .panel h3 { font-size: 1.05rem; margin-bottom: 2px; }
+  .panel .sub { font: 12px/1.4 var(--f-mono); color: var(--ink-3); margin: 0 0 8px; max-width: none; }
+  .panel svg { width: 100%; height: auto; display: block; }
+  .chart-note { font: 12px/1.5 var(--f-mono); color: var(--ink-3); max-width: none; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+  .chart-note i { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 5px; border: 1.5px solid; }
+  .tt { position: absolute; pointer-events: none; background: var(--ink); color: var(--paper); font: 12px/1.45 var(--f-mono); padding: 7px 10px; border-radius: 3px; opacity: 0; transform: translate(-50%, -100%); white-space: nowrap; z-index: 5; }
+  .tt.on { opacity: 1; }
+  .axis { font: 11px var(--f-mono); fill: var(--ink-3); }
+  .col-hit { fill: transparent; cursor: default; }
+  .col-hit:hover, .col-hit:focus { fill: color-mix(in srgb, var(--ink) 7%, transparent); }
+  .methods { display: grid; gap: 10px; margin: 6px 0 4px; }
+  .method-row { display: grid; grid-template-columns: 6.5rem 1fr 4.2rem; gap: 12px; align-items: center; font: 13px var(--f-mono); }
+  .method-row .b { height: 16px; background: var(--contour); }
+  .method-row.best .b { background: var(--ink); }
+  .method-row span:last-child { text-align: right; }
+  details { margin-top: 20px; }
+  summary { font: 500 13px var(--f-mono); cursor: pointer; padding: 6px 0; }
+  .table-wrap { overflow-x: auto; margin-top: 8px; }
+  table { border-collapse: collapse; width: 100%; font: 13px/1.4 var(--f-mono); font-variant-numeric: tabular-nums; background: var(--card); }
+  th, td { text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-weight: 500; color: var(--ink-3); border-bottom: 1px solid var(--ink); }
+  th:first-child, td:first-child { text-align: left; }
+  tr.flag td { background: color-mix(in srgb, var(--flag) 10%, transparent); }
+  tr.flag td:first-child { box-shadow: inset 4px 0 0 var(--flag); }
+  .variogram { width: 100%; max-width: 520px; height: auto; border: 1px solid var(--line); background: #fff; }
+  .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 36px; align-items: start; }
+  ul.plain { margin: 0; padding-left: 1.1em; max-width: var(--measure); }
+  ul.plain li { margin-bottom: 0.7em; }
+  .logbook-table td, .logbook-table th { white-space: normal; text-align: left; vertical-align: top; font: 14px/1.5 var(--f-body); padding: 12px 14px; }
+  .logbook-table th { font: 500 11px var(--f-mono); letter-spacing: .05em; text-transform: uppercase; }
+  .logbook-table td:first-child { font: 500 13px/1.4 var(--f-mono); width: 22%; }
+  .groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-bottom: 36px; }
+  .groups h3 { font-size: 0.95rem; font-family: var(--f-mono); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin-bottom: 8px; }
+  .groups ul { list-style: none; padding: 0; margin: 0; font-size: 1rem; }
+  .groups li { padding: 5px 0; border-bottom: 1px solid var(--line); }
+  pre { background: var(--code-bg); color: var(--code-fg); padding: 18px 20px; overflow-x: auto; font: 13px/1.7 var(--f-mono); margin: 0; }
+  footer { padding: 40px 0 64px; color: var(--ink-2); font-size: 0.92rem; }
+  footer p { max-width: 80ch; }
+  .error { background: var(--errbg); border: 1px solid var(--flag); padding: 14px 18px; margin: 16px 0; font: 14px var(--f-mono); }
+
+  @media (max-width: 900px) {
+    body { font-size: 17px; }
+    .hero-in { grid-template-columns: 1fr; padding-block: 64px 40px; gap: 32px; }
+    section.block { padding: 52px 0; }
+    .scrolly { display: block; }
+    .map-col { position: sticky; top: 0; z-index: 20; background: var(--paper); padding: 8px 0; border-bottom: 1px solid var(--line); }
+    .map-box { position: static; height: 50vh; max-height: none; }
+    .chapter { min-height: 60vh; padding: 6vh 0; }
+    .grid2, .two-col, .groups { grid-template-columns: 1fr; }
+    .legend .bar, .legend .range { width: 150px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .chapter { transition: none; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#findings">Skip to the main finding</a>
+
+<header class="hero">
+  <img class="hero-contours" src="img/contours.svg" alt="" aria-hidden="true">
+  <div class="container hero-in">
+    <div>
+      <p class="eyebrow">Geospatial analysis report · Oregon Cascades, USA</p>
+      <h1>Vegetation, moisture and canopy height in a mountain forest</h1>
+      <p class="lede">Three open data sources, eight scripts and one web page. The analysis measures how greenness (NDVI), leaf water content (NDMI) and canopy height (LiDAR) change with elevation, inside two coniferous-forest watersheds.</p>
+    </div>
+    <aside class="factsheet" aria-label="Fact sheet">
+      <div class="factsheet-title">Fact sheet</div>
+      <dl>
+        <div><dt>Area</dt><dd>~4.8 × 4.4 km box, from 432 to 1,222&nbsp;m</dd></div>
+        <div><dt>Data</dt><dd>Sentinel-2 L2A (2025) · Copernicus DEM GLO-30 · USGS 3DEP LiDAR (2021)</dd></div>
+        <div><dt>Analyzed</dt><dd><span data-f="pix">–</span> pixels of 20&nbsp;m in <span data-f="nbasins">2</span> watersheds</dd></div>
+        <div><dt>CRS</dt><dd>EPSG:32610 (UTM 10N, meters)</dd></div>
+        <div><dt>Access</dt><dd>All open; no account or key needed</dd></div>
+      </dl>
+    </aside>
+  </div>
+</header>
+
+<main id="content">
+<section class="block" id="question">
+  <div class="container">
+    <p class="eyebrow">The question</p>
+    <h2>Does the forest change as the mountain rises?</h2>
+    <p class="intro">Satellite imagery and a LiDAR survey can measure a forest without setting foot in it. The project covers the whole workflow: downloading the data, computing the indices, delineating the watersheds, comparing interpolation methods and publishing the result, using only free software.</p>
+    <div class="finding" id="findings">
+      <p>Greenness does not fall steadily with elevation. In almost every elevation band NDVI stays between <span class="num" data-f="ndvi_rest">–</span>, but in the <span class="num" data-f="band_anom">–</span> band it drops to <span class="num" data-f="ndvi_anom">–</span>. NDMI nearly halves: <span class="num" data-f="ndmi_anom">–</span> against <span class="num" data-f="ndmi_rest">–</span>. That is why the overall correlation with elevation is weak (−0.21): a straight line cannot describe a localized drop.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="map">
+  <div class="container">
+    <p class="eyebrow">The walkthrough</p>
+    <h2>From satellite to analysis zones</h2>
+    <p class="intro">Scroll: the map changes layer with each step. You can also pick a layer with the buttons.</p>
+    <div class="scrolly">
+      <div class="map-col">
+        <div class="map-box">
+          <div class="map-bar" role="group" aria-label="Map layer">
+            <button type="button" data-stage="area">Watersheds</button>
+            <button type="button" data-stage="ndvi">NDVI</button>
+            <button type="button" data-stage="ndmi">NDMI</button>
+            <button type="button" data-stage="canopy">Canopy</button>
+            <button type="button" data-stage="bands">Bands</button>
+          </div>
+          <div id="leaflet-map" role="application" aria-label="Watershed map"></div>
+          <div class="legend" id="legend" aria-live="polite"></div>
+          <label class="opacity-ctl">Opacity <input id="opacity" type="range" min="0.2" max="1" step="0.05" value="0.85"></label>
+        </div>
+      </div>
+      <div class="chapters">
+        <article class="chapter" data-stage="area">
+          <h3>The area and its two watersheds</h3>
+          <p>A box of about 4.8 × 4.4 km with strong relief. From the elevation model I computed where the water flows, which gave <span data-f="nbasins">2</span> watersheds of <span data-f="areas">–</span> km². Together they cover about 87&nbsp;% of the box.</p>
+          <p class="reading">A diagonal ridge separates the two. The straight edges are the limit of the downloaded area: the real watersheds continue beyond it.</p>
+          <p class="tool">Tool: pysheds (flow direction and accumulation) · Copernicus DEM GLO-30</p>
+        </article>
+        <article class="chapter" data-stage="ndvi">
+          <h3>How green: NDVI</h3>
+          <p>Healthy leaves absorb red light and reflect a lot of near-infrared. NDVI condenses that into one number: close to 1 means dense forest. It was computed from 81 Sentinel-2 scenes from 2025 with under 40&nbsp;% cloud, discarding clouds and shadows with the scene classification, and averaged over July to September.</p>
+          <p class="reading">Forest dominates the map (median 0.85), but there are red patches with straight edges. They look like clear-cuts; that is a hypothesis this analysis does not confirm.</p>
+          <p class="tool">Tool: pystac-client · odc-stac · xarray · rioxarray</p>
+        </article>
+        <article class="chapter" data-stage="ndmi">
+          <h3>How much water in the leaf: NDMI</h3>
+          <p>It swaps red for shortwave infrared, which water absorbs. It is an indicator of water in vegetation, not a measure of soil moisture.</p>
+          <p class="reading">It follows the same pattern as NDVI, with more contrast inside the forest: it runs from −0.41 to 0.62.</p>
+          <p class="tool">Tool: the same Sentinel-2 bands · SCL mask</p>
+        </article>
+        <article class="chapter" data-stage="canopy">
+          <h3>How tall the trees are: LiDAR</h3>
+          <p>An aircraft maps the terrain with laser pulses. With PDAL I removed noise, classified the ground and computed each point's height above it. Trees become the maximum height per cell (CHM), and bare terrain becomes the DTM.</p>
+          <p class="reading">Mind the dates: the LiDAR is from 2021 and Sentinel-2 from 2025. In the lowest-NDVI band the 2021 mean canopy is <span class="mono" data-f="chm_anom">–</span>&nbsp;m, the same as elsewhere: the forest was there when the aircraft flew.</p>
+          <p class="tool">Tool: PDAL (readers.ept · SMRF · hag_nn · writers.gdal) · USGS 3DEP</p>
+        </article>
+        <article class="chapter" data-stage="bands">
+          <h3>Analysis zones: elevation bands</h3>
+          <p>To compare fairly, the watersheds were split into 150&nbsp;m elevation bands and everything was summarized in each. The <span class="num mono" data-f="band_anom">–</span> band is the one that breaks the pattern: NDVI <span class="mono" data-f="ndvi_anom">–</span>, NDMI <span class="mono" data-f="ndmi_anom">–</span>.</p>
+          <p class="reading">Dashed bands have fewer than 500 pixels: their averages are unreliable.</p>
+          <p class="tool">Tool: rasterio · geopandas · DuckDB</p>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="method">
+  <div class="container">
+    <p class="eyebrow">How it was done</p>
+    <h2>Eight steps, in this order</h2>
+    <p class="intro">Each step is a script that reads <span class="mono">config.yml</span> and writes to <span class="mono">data/processed/</span>. Order matters: each one uses what the previous one produced.</p>
+    <ol class="steps">
+      <li><h3>Sentinel-2: vegetation indices</h3><p>Searches the STAC catalog for scenes, reads only the 4 needed bands over the study area, masks clouds and computes NDVI and NDMI per date. It ends with a control pixel recomputed by hand.</p><p class="io">in: Earth Search catalog → out: ndvi_summer.tif · ndmi_summer.tif · monthly series (Zarr)</p></li>
+      <li><h3>Elevation model</h3><p>Downloads the Copernicus DEM tile (30&nbsp;m) and reprojects it to meters.</p><p class="io">in: cop-dem-glo-30 → out: dem_utm.tif</p></li>
+      <li><h3>LiDAR with PDAL</h3><p>Five chained pipelines: download, ground classification, a sample for viewing, CHM and DTM.</p><p class="io">in: USGS 3DEP point cloud → out: chm.tif · dtm.tif · sample .laz</p></li>
+      <li><h3>Hydrology</h3><p>Fills DEM sinks, computes where water flows and how much accumulates, and delineates the watersheds and the drainage network.</p><p class="io">in: dem_utm.tif → out: watersheds · drainage network · 150&nbsp;m bands (GeoPackage)</p></li>
+      <li><h3>Geostatistics in R</h3><p>Takes 300 NDMI points as if they were sensors, holds out 20&nbsp;%, fits a variogram and compares kriging, IDW and Thiessen polygons.</p><p class="io">in: ndmi_summer.tif → out: interpolated maps · uncertainty · metrics</p></li>
+      <li><h3>Review in QGIS and CloudCompare</h3><p>Difference maps to see where the interpolation fails, and a point-cloud profile to check that the ground ended up under the forest.</p><p class="io">in: all layers → out: visual review</p></li>
+      <li><h3>Pixel table and SQL queries</h3><p>Joins NDVI, NDMI, elevation, canopy height and band into a 20&nbsp;m GeoParquet table and summarizes it with DuckDB.</p><p class="io">in: all rasters → out: pixels.parquet · summary by band</p></li>
+      <li><h3>This page</h3><p>Converts rasters to PNG and vectors to GeoJSON, then draws the map with Leaflet and the charts as SVG.</p><p class="io">in: results → out: docs/</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="block" id="band-results">
+  <div class="container">
+    <p class="eyebrow">Results by band</p>
+    <h2>The drop is in one band, not along a slope</h2>
+    <p class="intro">Each bar is a 150&nbsp;m elevation band. Highlighted: the lowest-NDVI band among those with enough data; hatched: bands with fewer than 500 pixels.</p>
+    <div class="grid2">
+      <div class="panel" id="g-ndvi"><h3>Mean NDVI</h3><p class="sub">Greenness. From 0 to 1.</p></div>
+      <div class="panel" id="g-ndmi"><h3>Mean NDMI</h3><p class="sub">Leaf water content. From 0 to 1.</p></div>
+    </div>
+    <div class="two-col" style="margin-top:24px">
+      <div class="panel" id="g-canopy"><h3>Canopy height</h3><p class="sub">Mean height (bar) and 95th percentile (mark), in meters. LiDAR from 2021, 3&nbsp;m cells.</p></div>
+      <div>
+        <h3>Greenness dropped; the trees did not</h3>
+        <p style="margin-top:10px">In the lowest-NDVI band, the mean canopy measured in 2021 is <span class="mono" data-f="chm_anom">–</span>&nbsp;m, the same as in the other bands. When the aircraft flew, the forest was there.</p>
+        <p>The most likely explanation is that the greenness was lost afterwards, through clear-cutting or another disturbance. That is a hypothesis: confirming it would take imagery from several years.</p>
+        <p class="chart-note" style="display:block">Heights depend on cell size: with 3&nbsp;m cells they come out taller than with 1.5&nbsp;m cells, because each cell keeps the highest point over a larger surface.</p>
+      </div>
+    </div>
+    <details>
+      <summary>View the data as a table</summary>
+      <div class="table-wrap"><table id="band-table"></table></div>
+    </details>
+  </div>
+</section>
+
+<section class="block" id="interpolation">
+  <div class="container">
+    <p class="eyebrow">Interpolation</p>
+    <h2>Kriging wins, but only just</h2>
+    <p class="intro">300 NDMI pixels were sampled as if they were field sensors and 20&nbsp;% were held out for scoring. Since the true map exists, each method's error can be measured on the 60 points none of them saw.</p>
+    <div class="two-col">
+      <div class="panel">
+        <h3>Error on the test points</h3>
+        <p class="sub">RMSE (lower is better)</p>
+        <div class="methods" id="methods"></div>
+        <p class="chart-note">Kriging beats IDW by 2&nbsp;%: with 60 test points, that gap could be chance. Thiessen, which copies the nearest sensor, is clearly worse.</p>
+      </div>
+      <div>
+        <img class="variogram" src="img/variogram.png" alt="Variogram of summer NDMI: semivariance rises up to about 600 meters and levels off near 0.03" loading="lazy">
+        <p class="chart-note" style="margin-top:10px">Exponential variogram: range of 282&nbsp;m. Moran's I = 0.51, so nearby pixels resemble each other and interpolating is worthwhile.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="limits">
+  <div class="container">
+    <p class="eyebrow">Scope</p>
+    <h2>What this analysis cannot claim</h2>
+    <p class="intro">Showing the limits is part of the result.</p>
+    <ul class="plain">
+      <li><strong>It does not explain the cause.</strong> It shows that something changes between 900 and 1,050&nbsp;m, not why. The clear-cut hypothesis is unconfirmed: it would take a multi-year image series or harvest maps.</li>
+      <li><strong>The kriging points are not real sensors.</strong> They were sampled from the satellite NDMI itself, so the exercise validates the method, not field measurement.</li>
+      <li><strong>NDMI is not soil moisture.</strong> It measures water in vegetation.</li>
+      <li><strong>Different dates.</strong> LiDAR from 2021 and Sentinel-2 from 2025: where things changed between them, the layers do not describe the same forest.</li>
+      <li><strong>Few pixels in some bands.</strong> The extreme bands give unstable averages.</li>
+      <li><strong>Clipped watersheds.</strong> They end at the edge of the downloaded area, not at their natural outlet.</li>
+      <li><strong>The DEM includes the canopy.</strong> It sits about 23&nbsp;m above the true LiDAR terrain, which can shift the drainage network slightly.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="block" id="logbook">
+  <div class="container">
+    <p class="eyebrow">Logbook</p>
+    <h2>What went wrong and how it was fixed</h2>
+    <p class="intro">Six real problems from running on real data. None of them crashed the program; most would have produced plausible but wrong results.</p>
+    <div class="table-wrap">
+      <table class="logbook-table">
+        <tr><th>Problem</th><th>Cause</th><th>How it was found and fixed</th></tr>
+        <tr><td>Summer NDVI equal to 1.000</td><td>The catalog declares an offset of −1000 in the values, but the data no longer carry it. Subtracting it left negative reflectance.</td><td>The control pixel recomputed by hand gave −5.03 versus 1.000. The real value range was measured (red min. 196) and the offset was set to 0.</td></tr>
+        <tr><td>Credentials error reading the DEM</td><td>The file sits in a public AWS bucket, but GDAL tried to sign the request.</td><td>The file was requested anonymously, without signing.</td></tr>
+        <tr><td>LiDAR: 177 million points and a PDAL failure</td><td>The requested resolution pulled almost all the density; PDAL runs a single output per pipeline and the ground filter fails if return numbers are 0.</td><td>The point count per resolution was measured, the process was split into five stages and the return numbers were fixed.</td></tr>
+        <tr><td>The DEM sits 23&nbsp;m above the terrain</td><td>Copernicus GLO-30 is a surface model: it includes the canopy.</td><td>Compared with the LiDAR DTM (correlation 0.994) and the limit was documented. For the NDVI correlation it makes no difference.</td></tr>
+        <tr><td>Only one watershed, 47&nbsp;% of the area</td><td>The script picked a single outlet, the one with the highest accumulation.</td><td>Spotted on the map. Added <span class="mono">n_basins</span>; there are now two, covering 87&nbsp;%.</td></tr>
+        <tr><td>Low-NDVI pixels with tall trees</td><td>The LiDAR is from 2021 and the NDVI from 2025.</td><td>Not fixed: documented. In the lowest-NDVI band the 2021 canopy measures <span class="mono" data-f="chm_anom">–</span>&nbsp;m, as in the others, which points to cover lost after 2021 (unconfirmed hypothesis).</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="tools" style="border-bottom:0">
+  <div class="container">
+    <p class="eyebrow">Tools</p>
+    <h2>All free software</h2>
+    <div class="groups" style="margin-top:28px">
+      <div><h3>Python</h3><ul><li>pystac-client · odc-stac</li><li>xarray · rioxarray · zarr</li><li>rasterio · geopandas · shapely</li><li>pysheds · scipy</li><li>pyarrow · DuckDB</li><li>pytest · matplotlib</li></ul></div>
+      <div><h3>Data and processing</h3><ul><li>PDAL (point clouds)</li><li>R: terra · sf · gstat · spdep</li><li>GeoParquet · COG · Zarr</li><li>STAC (Earth Search)</li><li>conda-forge</li></ul></div>
+      <div><h3>Review and publishing</h3><ul><li>QGIS 4</li><li>CloudCompare</li><li>Leaflet</li><li>Hand-written SVG for the charts</li></ul></div>
+    </div>
+    <p class="eyebrow">To reproduce it</p>
+<pre>mamba env create -f environment.yml
+mamba activate basins
+python -m pytest tests -q          # 7 tests on synthetic data
+python scripts/01_sentinel2.py     # then 02, 03 and 04 (hydrology)
+Rscript scripts/05_kriging.R
+python scripts/06_duckdb_summary.py
+python scripts/07_web_report.py</pre>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="container">
+    <p>Contains modified Copernicus Sentinel data (2025) and Copernicus DEM GLO-30, free to use with attribution. LiDAR: USGS 3DEP, public domain. Basemap: © OpenStreetMap.</p>
+    <p>A practice project in remote sensing and GIS with public data. The end-to-end run used real data in October 2026.</p>
+    <p>Source code and instructions to reproduce it: <a href="https://github.com/100FOUNTS/andrews-watershed">github.com/100FOUNTS/andrews-watershed</a>.</p>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  "use strict";
+  var MIN_PX = 500;           // bands with fewer pixels are flagged as unreliable
+  var NS = "http://www.w3.org/2000/svg";
+  var NAMES = { ndvi: "Summer NDVI", ndmi: "Summer NDMI", chm: "Canopy height" };
+
+  function get(u) {
+    return fetch(u, { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error(u + ": " + r.status); return r.json(); });
+  }
+  function fmt(x, d) {
+    if (x === null || x === undefined || isNaN(x)) return "–";
+    return Number(x).toLocaleString("en", { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+  // "900-1050 m" -> "900–1,050 m"
+  function bandLabel(r) {
+    return String(r).replace(/\d{4,}/g, function (n) { return Number(n).toLocaleString("en"); }).replace("-", "–");
+  }
+  function tok(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function el(tag, attrs, txt) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (txt !== undefined) e.textContent = txt;
+    return e;
+  }
+
+  Promise.all([
+    get("data/layers.json"), get("data/band_summary.json"), get("data/basins.geojson"),
+    get("data/drainage.geojson"), get("data/bands.geojson"),
+    get("data/metrics.json").catch(function () { return []; })
+  ]).then(function (d) { init(d[0].layers, d[1], d[2], d[3], d[4], d[5]); })
+    .catch(function (e) {
+      document.getElementById("question").insertAdjacentHTML("afterbegin",
+        "<div class='container'><p class='error'>Could not load the data (" + e.message +
+        "). Open the page through a local server: python -m http.server 8000 --directory docs</p></div>");
+    });
+
+  function init(layers, rows, basins, drainage, bands, metrics) {
+    var eligible = rows.filter(function (f) { return f.pixels >= MIN_PX; });
+    var anomaly = eligible.reduce(function (a, b) { return b.ndvi_mean < a.ndvi_mean ? b : a; });
+    var rest = eligible.filter(function (f) { return f !== anomaly; });
+    var mm = function (k) { var v = rest.map(function (f) { return f[k]; }); return [Math.min.apply(null, v), Math.max.apply(null, v)]; };
+    var nv = mm("ndvi_mean"), nm = mm("ndmi_mean");
+
+    fillText({
+      pix: rows.reduce(function (s, f) { return s + f.pixels; }, 0).toLocaleString("en"),
+      nbasins: String(basins.features.length),
+      areas: basins.features.map(function (f) { return fmt(f.properties.area_km2, 1); }).join(" and "),
+      band_anom: bandLabel(anomaly.label),
+      ndvi_anom: fmt(anomaly.ndvi_mean, 2), ndmi_anom: fmt(anomaly.ndmi_mean, 2),
+      ndvi_rest: fmt(nv[0], 2) + " and " + fmt(nv[1], 2),
+      ndmi_rest: fmt(nm[0], 2) + "–" + fmt(nm[1], 2),
+      chm_anom: fmt(anomaly.chm_mean, 1)
+    });
+
+    storyMap(layers, basins, drainage, bands, rows, anomaly);
+    bandChart("g-ndvi", rows, "ndvi_mean", "var(--moss)", "ndvi", 1, anomaly);
+    bandChart("g-ndmi", rows, "ndmi_mean", "var(--water)", "ndmi", 1, anomaly);
+    bandChart("g-canopy", rows, "chm_mean", "var(--moss)", "canopy", 60, anomaly, "chm_p95");
+    renderTable(rows, anomaly);
+    renderMethods(metrics);
+  }
+
+  function fillText(v) {
+    document.querySelectorAll("[data-f]").forEach(function (e) {
+      if (v[e.dataset.f] !== undefined) e.textContent = v[e.dataset.f];
+    });
+  }
+
+  /* ---------------- Map ---------------- */
+  function storyMap(layers, basins, drainage, bands, rows, anomaly) {
+    var map = L.map("leaflet-map", { scrollWheelZoom: false, tap: false });
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "&copy; OpenStreetMap · Relief: Copernicus DEM" }).addTo(map);
+    map.createPane("raster").style.zIndex = 350;
+    map.createPane("vect").style.zIndex = 450;
+
+    var byBand = {};
+    rows.forEach(function (f) { byBand[f.band] = f; });
+    var basinLayer = L.geoJSON(basins, { pane: "vect", style: { color: tok("--ink"), weight: 2, fill: false } });
+    var drainageLayer = L.geoJSON(drainage, { pane: "vect", style: { color: tok("--water"), weight: 1.6 } });
+    var bandsLayer = L.geoJSON(bands, {
+      pane: "vect",
+      style: function (f) {
+        var r = byBand[f.properties.band] || {};
+        if (r.band === anomaly.band) return { color: tok("--flag"), weight: 2, fillColor: tok("--flag"), fillOpacity: 0.28 };
+        return { color: tok("--ink"), weight: 1, fillColor: tok("--ink"), fillOpacity: 0.05, dashArray: r.pixels < MIN_PX ? "4 4" : null };
+      },
+      onEachFeature: function (f, l) {
+        var r = byBand[f.properties.band];
+        if (r) l.bindTooltip(bandLabel(r.label) + " · NDVI " + fmt(r.ndvi_mean, 2) + " · NDMI " + fmt(r.ndmi_mean, 2) +
+          " · " + r.pixels.toLocaleString("en") + " px", { sticky: true });
+      }
+    });
+    var rasters = {};
+    var base = null;
+    layers.forEach(function (c) {
+      var o = L.imageOverlay(c.file, c.bounds, { pane: "raster", opacity: c.id === "relief" ? 1 : 0.85 });
+      if (c.id === "relief") base = o; else rasters[c.id] = o;
+    });
+    if (base) base.addTo(map);   // map base propio: sombreado de relief del DEM
+    var byId = {}; layers.forEach(function (c) { byId[c.id] = c; });
+
+    var STAGES = {
+      area:   { layer: null,  basins: 1, drainage: 1, bands: 0 },
+      ndvi:   { layer: "ndvi", basins: 1, drainage: 0, bands: 0 },
+      ndmi:   { layer: "ndmi", basins: 1, drainage: 0, bands: 0 },
+      canopy:  { layer: "chm", basins: 1, drainage: 0, bands: 0 },
+      bands: { layer: null,  basins: 1, drainage: 0, bands: 1 }
+    };
+    var current = null;
+    function toggle(group, on) { if (on) group.addTo(map); else map.removeLayer(group); }
+
+    function showStage(id) {
+      if (id === current || !STAGES[id]) return;
+      current = id;
+      var cfg = STAGES[id];
+      Object.keys(rasters).forEach(function (k) { map.removeLayer(rasters[k]); });
+      if (cfg.layer && rasters[cfg.layer]) { rasters[cfg.layer].addTo(map); rasters[cfg.layer].setOpacity(document.getElementById("opacity").value); }
+      toggle(bandsLayer, cfg.bands); toggle(basinLayer, cfg.basins); toggle(drainageLayer, cfg.drainage);
+      document.querySelectorAll(".map-bar button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.stage === id); });
+      document.querySelectorAll(".chapter").forEach(function (c) { c.classList.toggle("active", c.dataset.stage === id); });
+      renderLegend(id, cfg);
+    }
+
+    function renderLegend(id, cfg) {
+      var L_ = document.getElementById("legend"), h = "";
+      if (cfg.layer) {
+        var c = byId[cfg.layer];
+        h = "<div><div class='bar' style='background:linear-gradient(90deg," + c.legend.join(",") + ")'></div>" +
+            "<div class='range'><span>" + fmt(c.min, c.unit ? 0 : 2) + "</span><span>" + NAMES[c.id] + (c.unit ? " (" + c.unit + ")" : "") + "</span><span>" + fmt(c.max, c.unit ? 0 : 2) + "</span></div></div>";
+        if (cfg.layer === "chm") h += "<span>LiDAR from 2021, 3 m cells.</span>";
+      } else if (cfg.bands) {
+        h = "<span><i class='sw rel'></i>Lowest-NDVI band</span><span><i class='sw' style='border-top-style:dashed;border-color:var(--ink)'></i>Fewer than " + MIN_PX + " px</span>";
+      } else {
+        h = "<span><i class='sw' style='border-color:var(--ink)'></i>Watershed</span><span><i class='sw' style='border-color:var(--water)'></i>Drainage network</span>";
+      }
+      L_.innerHTML = h;
+    }
+
+    map.fitBounds(basinLayer.getBounds(), { padding: [10, 10] });
+    showStage("area");
+    document.querySelectorAll(".map-bar button").forEach(function (b) {
+      b.addEventListener("click", function () { showStage(b.dataset.stage); });
+    });
+    document.getElementById("opacity").addEventListener("input", function (e) {
+      Object.keys(rasters).forEach(function (k) { rasters[k].setOpacity(e.target.value); });
+    });
+
+    if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (es) {
+        es.forEach(function (e) { if (e.isIntersecting) showStage(e.target.dataset.stage); });
+      }, { rootMargin: "-48% 0px -42% 0px" });
+      document.querySelectorAll(".chapter").forEach(function (c) { io.observe(c); });
+    }
+    setTimeout(function () { map.invalidateSize(); }, 200);
+  }
+
+  /* ---------------- Bar chart by band ---------------- */
+  function bandChart(panelId, rows, key, color, idc, max, anomaly, p95Key) {
+    var panel = document.getElementById(panelId);
+    var W = 520, H = 290, m = { l: 38, r: 8, t: 22, b: 40 };
+    var iw = W - m.l - m.r, ih = H - m.t - m.b, n = rows.length, step = iw / n, bw = Math.min(40, step * 0.62);
+    var y = function (v) { return m.t + ih * (1 - Math.min(v, max) / max); };
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": panel.querySelector("h3").textContent + " by elevation band" });
+    var defs = el("defs", {});
+    var pat = el("pattern", { id: "h-" + idc, width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
+    pat.appendChild(el("line", { x1: 0, y1: 0, x2: 0, y2: 6, style: "stroke:" + color + ";stroke-width:2.2" }));
+    defs.appendChild(pat); svg.appendChild(defs);
+
+    var ticks = max === 1 ? [0, 0.2, 0.4, 0.6, 0.8, 1] : [0, 15, 30, 45, 60];
+    ticks.forEach(function (t) {
+      svg.appendChild(el("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), style: "stroke:var(--line);stroke-width:" + (t === 0 ? 1.5 : 1) }));
+      svg.appendChild(el("text", { x: m.l - 6, y: y(t) + 4, "text-anchor": "end", class: "axis" }, fmt(t, max === 1 ? 1 : 0)));
+    });
+    var tt = document.createElement("div"); tt.className = "tt"; panel.appendChild(tt);
+
+    rows.forEach(function (f, i) {
+      var x = m.l + i * step + (step - bw) / 2, v = f[key], cx = x + bw / 2;
+      var few = f.pixels < MIN_PX, isAnomaly = f === anomaly;
+      svg.appendChild(el("text", { x: cx, y: H - 22, "text-anchor": "middle", class: "axis" }, bandLabel(f.label).replace(" m", "")));
+      if (v === null || v === undefined || isNaN(v)) {
+        svg.appendChild(el("text", { x: cx, y: y(0) - 6, "text-anchor": "middle", class: "axis" }, "no LiDAR"));
+      } else {
+        var top = y(v), r = Math.min(3, y(0) - top), base = y(0);
+        var d = "M" + x + "," + base + "V" + (top + r) + "Q" + x + "," + top + " " + (x + r) + "," + top + "H" + (x + bw - r) +
+                "Q" + (x + bw) + "," + top + " " + (x + bw) + "," + (top + r) + "V" + base + "Z";
+        var col = isAnomaly ? "var(--flag)" : color;
+        svg.appendChild(el("path", { d: d, style: few ? "fill:url(#h-" + idc + ");stroke:" + col + ";stroke-width:1.5" : "fill:" + col }));
+        if (p95Key && f[p95Key] != null) {
+          svg.appendChild(el("line", { x1: x - 3, x2: x + bw + 3, y1: y(f[p95Key]), y2: y(f[p95Key]), style: "stroke:var(--ink);stroke-width:2" }));
+        }
+        if (isAnomaly) svg.appendChild(el("text", { x: cx, y: top - 6, "text-anchor": "middle", style: "font:500 12px var(--f-mono);fill:var(--flag)" }, fmt(v, max === 1 ? 2 : 1)));
+      }
+      var hit = el("rect", { x: m.l + i * step, y: m.t, width: step, height: ih + 14, class: "col-hit", tabindex: 0,
+        "aria-label": bandLabel(f.label) + ": " + (v == null ? "no data" : fmt(v, max === 1 ? 2 : 1)) + ", " + f.pixels.toLocaleString("en") + " pixels" });
+      var show = function () {
+        var pr = panel.getBoundingClientRect(), sr = svg.getBoundingClientRect(), k = sr.width / W;
+        tt.style.left = (sr.left - pr.left + cx * k) + "px";
+        tt.style.top = (sr.top - pr.top + (v == null ? y(0) : y(v)) * k - 6) + "px";
+        tt.innerHTML = bandLabel(f.label) + "<br>" + (v == null ? "no LiDAR" : fmt(v, max === 1 ? 2 : 1) + (p95Key ? " m (p95 " + fmt(f[p95Key], 1) + ")" : "")) +
+          "<br>" + f.pixels.toLocaleString("en") + " px" + (few ? " · low confidence" : "");
+        tt.classList.add("on");
+      };
+      hit.addEventListener("mouseenter", show); hit.addEventListener("focus", show);
+      hit.addEventListener("mouseleave", function () { tt.classList.remove("on"); });
+      hit.addEventListener("blur", function () { tt.classList.remove("on"); });
+      svg.appendChild(hit);
+    });
+    svg.appendChild(el("text", { x: m.l + iw / 2, y: H - 4, "text-anchor": "middle", class: "axis" }, "Elevation band (m)"));
+    panel.appendChild(svg);
+
+    var note = document.createElement("p"); note.className = "chart-note";
+    note.innerHTML = "<span><i style='border-color:var(--flag);background:var(--flag)'></i>Lowest-NDVI band</span>" +
+      "<span><i style='border-color:" + color + ";background:repeating-linear-gradient(45deg," + color + " 0 2px,transparent 2px 5px)'></i>Fewer than " + MIN_PX + " px</span>" +
+      (p95Key ? "<span><i style='border:0;border-top:2px solid var(--ink);height:0;width:14px;vertical-align:3px'></i>95th percentile</span>" : "");
+    panel.appendChild(note);
+  }
+
+  /* ---------------- Table ---------------- */
+  function renderTable(rows, anomaly) {
+    var h = "<tr><th>Band</th><th>Pixels</th><th>Mean elevation (m)</th><th>NDVI</th><th>NDMI</th><th>Mean canopy (m)</th><th>Canopy p95 (m)</th></tr>";
+    var v = function (x, d) { return x == null ? "no LiDAR" : fmt(x, d); };
+    rows.forEach(function (f) {
+      h += "<tr" + (f === anomaly ? " class='flag'" : "") + "><td>" + bandLabel(f.label) + "</td><td>" + f.pixels.toLocaleString("en") + "</td><td>" + fmt(f.elev_mean, 0) +
+        "</td><td>" + fmt(f.ndvi_mean, 3) + "</td><td>" + fmt(f.ndmi_mean, 3) + "</td><td>" + v(f.chm_mean, 1) + "</td><td>" + v(f.chm_p95, 1) + "</td></tr>";
+    });
+    document.getElementById("band-table").innerHTML = h;
+  }
+
+  /* ---------------- Interpolation methods ---------------- */
+  function renderMethods(met) {
+    var box = document.getElementById("methods");
+    if (!met.length) { box.textContent = "No metrics: run Step 5 and regenerate the page."; return; }
+    var ord = met.slice().sort(function (a, b) { return a.RMSE - b.RMSE; });
+    var mx = Math.max.apply(null, ord.map(function (m) { return m.RMSE; }));
+    box.innerHTML = ord.map(function (m, i) {
+      return "<div class='method-row" + (i === 0 ? " best" : "") + "'><span>" + m.method + "</span><span class='b' style='width:" + (100 * m.RMSE / mx).toFixed(1) + "%'></span><span>" + fmt(m.RMSE, 3) + "</span></div>";
+    }).join("");
+  }
+})();
+</script>
+</body>
+</html>

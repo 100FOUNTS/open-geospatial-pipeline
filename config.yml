@@ -1,0 +1,39 @@
+# Single project configuration. Every script reads this file.
+# Example area: a coniferous forest with strong relief and public LiDAR
+# (near the Cascade Range, Oregon, USA).
+
+area:
+  # lon_min, lat_min, lon_max, lat_max (EPSG:4326). Covers about 4.8 x 4.4 km.
+  bbox: [-122.27, 44.21, -122.21, 44.25]
+  # Area for LiDAR. Same as bbox. A sub-area (e.g. [-122.255, 44.220, -122.225, 44.245]) downloads fewer points.
+  bbox_lidar: [-122.27, 44.21, -122.21, 44.25]
+  # UTM 10N, the metric system used by the Sentinel-2 scenes of this zone.
+  epsg_utm: 32610
+
+dates:
+  start: "2025-01-01"
+  end: "2025-12-31"
+
+sentinel2:
+  max_cloud: 40            # maximum % of cloud per scene
+  resolution: 20           # metres (the native SWIR band is 20 m)
+  summer_months: [7, 8, 9] # months used for the summer mean
+
+lidar:
+  # US 3DEP collection in EPT format, open and no account needed.
+  ept: "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/OR_McKenzieRiver_1_2021/ept.json"
+  ept_resolution: 5        # requested point spacing (Web Mercator units). Over the whole bbox: 3 pulls 157 M points; 5 and 6, 36 M
+  raster_resolution: 3     # CHM and DTM cell size in metres (at ~1.7 points/m2, smaller cells underestimate the canopy)
+  smrf_slope: 0.25         # raise it if the terrain is steeper
+  max_canopy_height: 70    # metres; anything above is treated as noise
+
+hydrology:
+  n_basins: 2              # how many basins to delineate (the largest first, then the next one)
+  accumulation_threshold: 100  # 30 m cells that define a stream (~0.09 km2)
+  band_step_m: 150         # width of each elevation band
+
+kriging:
+  n_points: 300
+  train_fraction: 0.8
+  max_neighbors: 40
+  seed: 42

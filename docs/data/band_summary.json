@@ -1,0 +1,79 @@
+[
+  {
+    "band": 0,
+    "label": "300-450 m",
+    "pixels": 383,
+    "elev_mean": 446.0,
+    "ndvi_mean": 0.797,
+    "ndmi_mean": 0.354,
+    "chm_pixels": 381,
+    "chm_mean": 31.1,
+    "chm_p95": 54.6
+  },
+  {
+    "band": 1,
+    "label": "450-600 m",
+    "pixels": 14905,
+    "elev_mean": 538.0,
+    "ndvi_mean": 0.828,
+    "ndmi_mean": 0.388,
+    "chm_pixels": 14870,
+    "chm_mean": 36.4,
+    "chm_p95": 56.3
+  },
+  {
+    "band": 2,
+    "label": "600-750 m",
+    "pixels": 16390,
+    "elev_mean": 670.0,
+    "ndvi_mean": 0.798,
+    "ndmi_mean": 0.362,
+    "chm_pixels": 16212,
+    "chm_mean": 37.6,
+    "chm_p95": 55.0
+  },
+  {
+    "band": 3,
+    "label": "750-900 m",
+    "pixels": 10696,
+    "elev_mean": 818.0,
+    "ndvi_mean": 0.784,
+    "ndmi_mean": 0.349,
+    "chm_pixels": 10451,
+    "chm_mean": 37.5,
+    "chm_p95": 55.0
+  },
+  {
+    "band": 4,
+    "label": "900-1050 m",
+    "pixels": 3364,
+    "elev_mean": 960.0,
+    "ndvi_mean": 0.677,
+    "ndmi_mean": 0.195,
+    "chm_pixels": 3080,
+    "chm_mean": 37.8,
+    "chm_p95": 54.9
+  },
+  {
+    "band": 5,
+    "label": "1050-1200 m",
+    "pixels": 1261,
+    "elev_mean": 1114.0,
+    "ndvi_mean": 0.784,
+    "ndmi_mean": 0.361,
+    "chm_pixels": 867,
+    "chm_mean": 39.0,
+    "chm_p95": 49.9
+  },
+  {
+    "band": 6,
+    "label": "1200-1350 m",
+    "pixels": 120,
+    "elev_mean": 1209.0,
+    "ndvi_mean": 0.843,
+    "ndmi_mean": 0.448,
+    "chm_pixels": 102,
+    "chm_mean": 35.6,
+    "chm_p95": 50.6
+  }
+]
