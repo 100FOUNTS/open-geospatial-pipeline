@@ -1,5 +1,6 @@
 # Andrews Watershed: vegetation, moisture and canopy height with open tools
 
+
 An end-to-end remote sensing and GIS workflow built only with free software and public data.
 It measures how greenness (NDVI), leaf water content (NDMI) and canopy height (LiDAR) change with
 elevation inside two forested mountain watersheds in the Oregon Cascades, USA, and ends in a
@@ -131,6 +132,9 @@ python scripts/08_figures.py
 
 python -m http.server 8000 --directory docs    # then open http://localhost:8000
 ```
+
+`environment.lock.yml` holds the exact versions of the environment that passed the tests (macOS, Apple silicon, October 2026);
+if a newer release breaks something, create the environment from that file instead (`mamba env create -f environment.lock.yml`).
 
 Nothing needs an account or key. To try steps 4 to 7 without downloading anything, run
 `python tests/demo_data.py` (synthetic data; delete `data/processed/` before using real data).
