@@ -36,14 +36,39 @@ Bands with fewer than 500 pixels (the first and the last) give unstable averages
 
 ## The pipeline
 
+```mermaid
+flowchart LR
+    S2[("Sentinel-2<br/>L2A scenes")]
+    DEM[("Copernicus<br/>DEM GLO-30")]
+    LAS[("USGS 3DEP<br/>LiDAR")]
+
+    S2 --> P1["<b>1</b> NDVI and NDMI<br/>odc-stac, xarray"]
+    DEM --> P2["<b>2</b> Elevation model<br/>UTM 10N"]
+    LAS --> P3["<b>3</b> CHM and DTM<br/>PDAL"]
+
+    P2 --> P4["<b>4</b> Basins, drainage<br/>and elevation bands<br/>pysheds"]
+    P1 --> P5["<b>5</b> Kriging vs IDW<br/>vs Thiessen<br/>R: gstat"]
+
+    P1 --> P6
+    P3 --> P6
+    P4 --> P6["<b>6</b> GeoParquet table<br/>and SQL summary<br/>DuckDB"]
+
+    P6 --> P7["<b>7</b> Web report<br/>Leaflet + SVG"]
+    P5 --> P7
+    P6 --> P8["<b>8</b> README figures<br/>matplotlib"]
+
+    P3 -.-> CC{{"CloudCompare<br/>inspect the cloud"}}
+    P5 -.-> QG{{"QGIS<br/>compare maps"}}
+
+    classDef data fill:#e8f1ea,stroke:#2a8a47,color:#14231d
+    classDef step fill:#f8faf7,stroke:#14231d,color:#14231d
+    classDef manual fill:#fff3ee,stroke:#c2410c,color:#14231d,stroke-dasharray: 4 3
+    class S2,DEM,LAS data
+    class P1,P2,P3,P4,P5,P6,P7,P8 step
+    class CC,QG manual
 ```
-Sentinel-2 ──► 01 NDVI and NDMI ──────────────┐
-Copernicus DEM ► 02 DEM ──► 04 basins, drainage, bands ─┤
-USGS LiDAR ──► 03 CHM and DTM ────────────────┼─► 06 GeoParquet ─► DuckDB ─┐
-                    │                         │                            ├─► 07 web report (Leaflet)
-          CloudCompare (inspect)   05 kriging in R ──► QGIS (compare) ───────┘
-                                                                           └─► 08 README figures
-```
+
+Dashed boxes are manual review steps, not scripts.
 
 | Step | Script | What it does | Main tools |
 |---|---|---|---|
